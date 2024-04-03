@@ -95,14 +95,27 @@ if(BUILD_CPP_TEST)
   add_subdirectory(tests/cpp)
 endif()
 
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  set(SYSTEM_INCL "")
+else()
+  # If this project is included from somewhere else, we mark our headers as system headers to avoid
+  # the compiler emitting any warnings about them
+  set(SYSTEM_INCL "SYSTEM")
+endif()
+
 add_library(treelite SHARED)
 target_link_libraries(treelite PRIVATE objtreelite)
-
+target_include_directories(treelite ${SYSTEM_INCL} PUBLIC 
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
 set(TREELITE_TARGETS treelite)
 
 if(Treelite_BUILD_STATIC_LIBS)
   add_library(treelite_static STATIC)
   target_link_libraries(treelite_static PRIVATE objtreelite)
+  target_include_directories(treelite_static ${SYSTEM_INCL} PUBLIC 
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
   list(APPEND TREELITE_TARGETS treelite_static)
 endif()
 
