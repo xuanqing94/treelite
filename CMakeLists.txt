@@ -125,10 +125,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
-set(INSTALL_TARGETS ${TREELITE_TARGETS} objtreelite rapidjson mdspan)
-if(NOT nlohmann_json_FOUND)  # Fetched nlohmann/json via FetchContent
-  list(APPEND INSTALL_TARGETS nlohmann_json)
-endif()
+set(INSTALL_TARGETS ${TREELITE_TARGETS})
 install(TARGETS ${INSTALL_TARGETS}
     EXPORT TreeliteTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
