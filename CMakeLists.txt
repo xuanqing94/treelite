@@ -100,13 +100,15 @@ if(BUILD_CPP_TEST)
 endif()
 
 add_library(treelite SHARED)
-target_link_libraries(treelite PRIVATE objtreelite)
+# target_link_libraries(treelite PRIVATE objtreelite)
+target_sources(treelite PRIVATE $<TARGET_OBJECTS:objtreelite>)
 
 set(TREELITE_TARGETS treelite)
 
 if(Treelite_BUILD_STATIC_LIBS)
   add_library(treelite_static STATIC)
-  target_link_libraries(treelite_static PRIVATE objtreelite)
+  # target_link_libraries(treelite_static PRIVATE objtreelite)
+  target_sources(treelite_static PRIVATE $<TARGET_OBJECTS:objtreelite>)
   list(APPEND TREELITE_TARGETS treelite_static)
 endif()
 
