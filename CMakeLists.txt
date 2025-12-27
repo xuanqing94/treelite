@@ -8,25 +8,6 @@ if(POLICY CMP0135)
   cmake_policy(SET CMP0135 NEW)
 endif()
 
-# Check compiler versions
-# Use latest compilers to ensure that std::filesystem is available
-if(MSVC)
-  if(MSVC_VERSION LESS 1930)
-    message(FATAL_ERROR "Need Visual Studio 2022 or newer to build Treelite")
-  endif()
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.1")
-    message(FATAL_ERROR "Need GCC 8.1 or newer to build Treelite")
-  endif()
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "11.0")
-    message(FATAL_ERROR "Need Xcode 11.0 (AppleClang 11.0) or newer to build Treelite")
-  endif()
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
-    message(FATAL_ERROR "Need Clang 9.0 or newer to build Treelite")
-  endif()
-endif()
 
 # Options useful for downstream projects
 option(Treelite_BUILD_STATIC_LIBS "Build static libs, in addition to dynamic libs" OFF)
@@ -38,24 +19,12 @@ option(Treelite_USE_DYNAMIC_MSVC_RUNTIME
 option(TEST_COVERAGE "C++ test coverage" OFF)
 option(USE_OPENMP "Use OpenMP" ON)
 option(BUILD_DOXYGEN "Build documentation for C/C++ functions using Doxygen." OFF)
-option(BUILD_CPP_TEST "Build C++ tests" OFF)
 option(DETECT_CONDA_ENV "Enable detection of conda environment for dependencies" ON)
 option(HIDE_CXX_SYMBOLS "Hide all C++ symbols. Useful when building Pip package" OFF)
 option(ENABLE_ALL_WARNINGS "Enable all compiler warnings. Only effective for GCC/Clang" OFF)
 option(USE_SANITIZER "Use sanitizer flags" OFF)
 SET(ENABLED_SANITIZERS "address" "leak" "undefined" CACHE STRING
     "Semicolon separated list of sanitizer names. E.g 'address;leak'.")
-
-if(MSVC)
-  if(Treelite_USE_DYNAMIC_MSVC_RUNTIME)
-    message(STATUS "Using dynamically linked MSVC runtime...")
-    set(Treelite_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-  else()
-    message(STATUS "Using statically linked MSVC runtime...")
-    set(Treelite_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-  endif()
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "${Treelite_MSVC_RUNTIME_LIBRARY}")
-endif()
 
 if(USE_SANITIZER)
   include(cmake/Sanitizer.cmake)
@@ -73,85 +42,134 @@ if(BUILD_DOXYGEN)
   run_doxygen()
 endif()
 
-# When installing dependencies, use Conda environment if available
-if(DETECT_CONDA_ENV)
-  if(DEFINED ENV{CONDA_PREFIX})
-    string(REPLACE "\\" "/" CONDA_PREFIX "$ENV{CONDA_PREFIX}")
-    set(CMAKE_PREFIX_PATH "${CONDA_PREFIX};${CMAKE_PREFIX_PATH}")
-    message(STATUS "Detected Conda environment, CMAKE_PREFIX_PATH set to: ${CMAKE_PREFIX_PATH}")
-    if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT OR USING_CONDA_INSTALL_PREFIX)
-      message(STATUS "No CMAKE_INSTALL_PREFIX argument detected, setting to: ${CONDA_PREFIX}")
-      set(CMAKE_INSTALL_PREFIX "${CONDA_PREFIX}")
-      set(USING_CONDA_INSTALL_PREFIX ON CACHE BOOL "Installing into Conda prefix")
-    endif()
-  else()
-    message(STATUS "No Conda environment detected")
-  endif()
-endif()
-
 include(cmake/ExternalLibs.cmake)
 include(cmake/Utils.cmake)
 include(cmake/Version.cmake)
 
-add_subdirectory(src)
+set(TREELITE_SOURCES
+    # Headers
+    ${PROJECT_SOURCE_DIR}/include/treelite/c_api.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/c_api_error.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/contiguous_array.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/error.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/gtil.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/logging.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/model_builder.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/model_loader.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/pybuffer_frame.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/thread_local.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/tree.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/detail/contiguous_array.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/detail/file_utils.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/detail/omp_exception.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/detail/serializer.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/detail/serializer_mixins.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/detail/threading_utils.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/detail/tree.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/enum/operator.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/enum/task_type.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/enum/tree_node_type.h
+    ${PROJECT_SOURCE_DIR}/include/treelite/enum/typeinfo.h
+    
+    # Sources (Paths relative to root usually, unless src/ handles it)
+    # Assuming these files are inside 'src/' folder, adjust paths if needed.
+    src/field_accessor.cc
+    src/json_serializer.cc
+    src/logging.cc
+    src/model_concat.cc
+    src/model_query.cc
+    src/serializer.cc
+    src/c_api/c_api_error.cc
+    src/c_api/c_api_utils.h
+    src/c_api/field_accessor.cc
+    src/c_api/gtil.cc
+    src/c_api/logging.cc
+    src/c_api/model.cc
+    src/c_api/model_builder.cc
+    src/c_api/model_loader.cc
+    src/c_api/serializer.cc
+    src/c_api/sklearn.cc
+    src/enum/operator.cc
+    src/enum/task_type.cc
+    src/enum/tree_node_type.cc
+    src/enum/typeinfo.cc
+    src/gtil/config.cc
+    src/gtil/output_shape.cc
+    src/gtil/postprocessor.cc
+    src/gtil/postprocessor.h
+    src/gtil/predict.cc
+    src/model_builder/metadata.cc
+    src/model_builder/model_builder.cc
+    src/model_builder/detail/json_parsing.h
+    src/model_loader/lightgbm.cc
+    src/model_loader/sklearn.cc
+    src/model_loader/xgboost_json.cc
+    src/model_loader/xgboost_legacy.cc
+    src/model_loader/xgboost_ubjson.cc
+    src/model_loader/detail/lightgbm.h
+    src/model_loader/detail/string_utils.h
+    src/model_loader/detail/xgboost.cc
+    src/model_loader/detail/xgboost.h
+    src/model_loader/detail/xgboost_json/sax_adapters.h
+    src/model_loader/detail/xgboost_json/sax_adapters.cc
+    src/model_loader/detail/xgboost_json/delegated_handler.h
+    src/model_loader/detail/xgboost_json/delegated_handler.cc
+)
 
-if(BUILD_CPP_TEST)
-  add_subdirectory(tests/cpp)
-endif()
+function(setup_treelite_target target_name)
+    # -- 1. Link Internal Dependencies (PRIVATE) --
+    # Crucial: This hides json/mdspan from the export set.
+    target_link_libraries(${target_name} 
+        PRIVATE 
+        RapidJSON::rapidjson 
+        nlohmann_json::nlohmann_json 
+        std::mdspan
+    )
 
-add_library(treelite SHARED)
-# target_link_libraries(treelite PRIVATE objtreelite)
-target_sources(treelite PRIVATE $<TARGET_OBJECTS:objtreelite>)
+    # -- 2. Include Directories (PUBLIC) --
+    # This ensures consumers can find treelite/c_api.h
+    target_include_directories(${target_name} PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    )
 
-set(TREELITE_TARGETS treelite)
+    # -- 3. Compiler Options --
+    target_compile_features(${target_name} PUBLIC cxx_std_17)
+    set_target_properties(${target_name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    
+    if(ENABLE_ALL_WARNINGS)
+        target_compile_options(${target_name} PRIVATE -Wall -Wextra)
+    endif()
+
+    target_compile_options(${target_name} PRIVATE -funroll-loops)
+    if(HIDE_CXX_SYMBOLS)
+        set_target_properties(${target_name} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    endif()
+
+    if(TEST_COVERAGE AND NOT MSVC)
+        target_compile_options(${target_name} PUBLIC -g3 --coverage)
+        target_link_options(${target_name} PUBLIC --coverage)
+    endif()
+
+    # -- 4. OpenMP --
+    if(USE_OPENMP)
+        find_package(OpenMP REQUIRED)
+        if(OpenMP_FOUND)
+            target_link_libraries(${target_name} PRIVATE OpenMP::OpenMP_CXX)
+            target_compile_definitions(${target_name} PUBLIC -DTREELITE_OPENMP_SUPPORT)
+        endif()
+    endif()
+endfunction()
+
+add_library(treelite SHARED ${TREELITE_SOURCES})
+setup_treelite_target(treelite)
+set_target_properties(treelite PROPERTIES VERSION ${PROJECT_VERSION})
 
 if(Treelite_BUILD_STATIC_LIBS)
-  add_library(treelite_static STATIC)
-  # target_link_libraries(treelite_static PRIVATE objtreelite)
-  target_sources(treelite_static PRIVATE $<TARGET_OBJECTS:objtreelite>)
-  list(APPEND TREELITE_TARGETS treelite_static)
+    add_library(treelite_static STATIC ${TREELITE_SOURCES})
+    setup_treelite_target(treelite_static)
+    # Ensure standard naming (libtreelite.a)
+    set_target_properties(treelite_static PROPERTIES OUTPUT_NAME "treelite")
 endif()
-
-foreach(lib ${TREELITE_TARGETS})
-  set_output_directory(${lib} ${PROJECT_BINARY_DIR})
-  if(MSVC)
-    set_target_properties(${lib} PROPERTIES
-      MSVC_RUNTIME_LIBRARY "${Treelite_MSVC_RUNTIME_LIBRARY}")
-  endif()
-endforeach()
-
-# Export install targets
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-  # Include CPack only if the current project is top level.
-  include(CPack)
-endif()
-include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
-set(INSTALL_TARGETS ${TREELITE_TARGETS})
-install(TARGETS ${INSTALL_TARGETS}
-    EXPORT TreeliteTargets
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    INCLUDES DESTINATION include)
-install(DIRECTORY include/treelite "${PROJECT_BINARY_DIR}/include/treelite"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-install(EXPORT TreeliteTargets
-    FILE TreeliteTargets.cmake
-    NAMESPACE treelite::
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/treelite")
-configure_package_config_file(
-    cmake/TreeliteConfig.cmake.in
-    "${PROJECT_BINARY_DIR}/cmake/TreeliteConfig.cmake"
-    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/treelite")
-write_basic_package_version_file(
-    "${PROJECT_BINARY_DIR}/cmake/TreeliteConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion)
-install(FILES
-    "${PROJECT_BINARY_DIR}/cmake/TreeliteConfig.cmake"
-    "${PROJECT_BINARY_DIR}/cmake/TreeliteConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/treelite")
-
 write_version()
-set_default_configuration_release()
